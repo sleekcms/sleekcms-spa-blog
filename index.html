@@ -9,7 +9,10 @@
 
   <body>
     <header style="display: flex; align-items: flex-start; justify-content: space-between">
+        <div>
       <h1 id="siteTitle" style="font-weight: 400">…</h1>
+      <small id="siteSubtitle"></small>
+      </div>
       <nav><a id="homeLink">Home</a></nav>
     </header>
     <main>
@@ -18,7 +21,17 @@
       </article>
     </main>
 
-    <footer>Minimal Single-Page App Blog using SleekCMS client. Go ahead, right click and view source.</footer>
+    <footer style="text-align: center;">
+      <small>Minimal Single-Page App Blog using SleekCMS client. Go ahead, right click and view source.</small>
+      <br/>
+      <small>
+        <a href="https://github.com/sleekcms/sleekcms-spa-blog" target="_blank" rel="noopener">Github</a>
+        •
+        <a href="https://github.com/sleekcms/sleekcms-next-blog" target="_blank" rel="noopener">Next.js Blog</a>
+        •
+        <a href="https://app.sleekcms.com" target="_blank" rel="noopener">Login to SleekCMS</a>
+      </small>
+    </footer>
 
     <!-- SleekCMS client from unpkg -->
     <script src="https://unpkg.com/@sleekcms/client"></script>
@@ -39,6 +52,7 @@
 
       const elApp = document.getElementById("app");
       const elSiteTitle = document.getElementById("siteTitle");
+      const elSiteSubtitle = document.getElementById("siteSubtitle");
 
       // ====== HELPERS ======
       function normalizePath(p) {
@@ -69,6 +83,7 @@
         const t = (text && String(text).trim()) || "Blog";
         document.title = t;
         elSiteTitle.textContent = homePage && homePage.title ? String(homePage.title) : "My Blog";
+        elSiteSubtitle.textContent = homePage && homePage.sub_title ? String(homePage.sub_title) : "Minimal Single-Page App Blog using SleekCMS client";
       }
 
       function isBlogPostPath(p) {
