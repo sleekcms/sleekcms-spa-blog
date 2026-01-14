@@ -1,114 +1,140 @@
-# SleekCMS SPA Blog
+# One-Page Blog (SleekCMS SPA)
 
-A minimal single-page application (SPA) blog that fetches and renders content directly from [SleekCMS](https://sleekcms.com/) in the browser. No build step, no server required—just open the HTML file or serve it with any static file server.
+This repository contains a **single-file blog website** powered by **SleekCMS**.  
+It loads content using the official `@sleekcms/client`, renders a home page and blog posts, and navigates using **SPA routing** (hash-based or history state) — all without a build step.
+
+The entire site lives in **one HTML file**.
+
+---
 
 ## Features
 
-- **Client-Side Rendering**: Fetches content directly from SleekCMS using the JavaScript client
-- **Zero Build Step**: Single HTML file with no dependencies to install
-- **Two Routing Modes**: Hash-based routing (`#/blog/post`) or HTML5 History API (`/blog/post`)
-- **Lightweight Styling**: Uses [Pico CSS](https://picocss.com/) for classless, semantic styling
-- **Blog-Ready**: Lists posts from `/blog` and renders individual post pages with title, image, and rich content
+- ✅ Single HTML file (no build, no bundler)
+- ✅ Uses `@sleekcms/client` from unpkg
+- ✅ Configurable routing: hash-based (`#/`) or history state (`/`)
+- ✅ Home page with list of blog posts
+- ✅ Blog post page with title, image, and HTML content
+- ✅ Works on any static host (Netlify, Vercel, GitHub Pages, S3, etc.)
+- ✅ “View source” link for easy inspection
 
-## Quick Start
-
-1. **Get a SleekCMS Site Token**
-   
-   Register at [app.sleekcms.com](https://app.sleekcms.com/) and create a site to get your public site token.
-
-2. **Configure the Token**
-   
-   Open `index.html` and replace the `SITE_TOKEN` value with your own:
-   
-   ```javascript
-   const SITE_TOKEN = "pub-xxxxx-your-token-here";
-   ```
-
-3. **Serve the File**
-   
-   Use any static file server. For example:
-   
-   ```bash
-   npx http-server .
-   ```
-   
-   Then open [http://localhost:8080](http://localhost:8080) in your browser.
-
-## Configuration
-
-Edit the configuration section at the top of the `<script>` block in `index.html`:
-
-| Variable     | Description                                                                 |
-|--------------|-----------------------------------------------------------------------------|
-| `SITE_TOKEN` | Your SleekCMS public site token (starts with `pub-`)                        |
-| `ENV`        | Content environment to fetch (`"latest"`, `"published"`, or a specific env) |
-| `SPA`        | Routing mode: `false` = hash routing, `true` = history API routing          |
-
-### Routing Modes
-
-- **Hash Routing (`SPA = false`)**: URLs look like `/#/blog/my-post`. Works with any static file server without additional configuration.
-
-- **History Routing (`SPA = true`)**: URLs look like `/blog/my-post`. Requires server-side configuration to redirect all paths to `index.html`.
-
-## Content Structure
-
-The app expects the following page structure in your SleekCMS site:
-
-```
-/                  # Home page (displays site title and blog post list)
-/blog/
-  /blog/post-1     # Blog post with title, image, and content fields
-  /blog/post-2
-  /blog/...
-```
-
-### Expected Page Fields
-
-| Field     | Type   | Description                        |
-|-----------|--------|------------------------------------|
-| `title`   | String | Page/post title                    |
-| `image`   | Asset  | Featured image (optional)          |
-| `content` | HTML   | Rich text content for the post     |
+---
 
 ## How It Works
 
-1. **Load SleekCMS Client**: The app loads the SleekCMS client from unpkg CDN
-2. **Sync Content**: Uses `createSyncClient()` to fetch and cache all site content
-3. **Build Routes**: Creates a path-to-page mapping for client-side routing
-4. **Render Views**: Displays home (post list) or individual post based on current URL
+### Content Source
 
-### Key Code Example
+Content is fetched directly from **SleekCMS public delivery API** using:
 
-```javascript
-// Initialize the SleekCMS client
-const client = await window.SleekCMS.createSyncClient({
-  siteToken: SITE_TOKEN,
-  env: "latest",
-  resolveEnv: true,
-});
-
-// Fetch pages
-const homePage = client.getPage("/");           // Single page
-const blogPages = client.getPages("/blog");     // All pages under /blog
+```js
+SleekCMS.createSyncClient({
+  siteToken: 'your-site-token',
+  env: 'latest'
+})
 ```
 
-## Development
+The client provides:
+- `getPage('/')` → home page metadata
+- `getPages('/blog')` → all blog posts
 
-No build tools required! Just edit `index.html` and refresh your browser.
+No REST calls, no manual JSON parsing.
 
-To run locally:
+---
 
-```bash
-# Using http-server
-npx http-server .
+## Content Structure in SleekCMS
 
-# Using Python
-python3 -m http.server 8080
+### Home Page
 
-# Using PHP
-php -S localhost:8080
+| Field | Type |
+|------|------|
+| title | Text |
+
+Path:
 ```
+/
+```
+
+### Blog Posts
+
+| Field | Type |
+|------|------|
+| title | Text |
+| image | Image |
+| content | HTML / Rich Text |
+
+Path pattern:
+```
+/blog/{slug}
+```
+
+---
+
+## Setup
+
+### 1. Create a SleekCMS Site
+1. Sign up at https://sleekcms.com
+2. Create a site
+3. Add page models for Home and Blog
+
+### 2. Get Your Site Token
+From the SleekCMS dashboard, copy the **Public Site Token**.
+
+### 3. Update the HTML File
+
+Edit the configuration at the top of `index.html`:
+
+```js
+const SITE_TOKEN = "your-site-token";
+const ENV = "latest";
+const SPA = true; // Set to true for history state routing, false for hash routing
+```
+
+**Routing Options:**
+- `SPA = true`: Uses clean URLs with `history.pushState` (`/`, `/blog/post-slug`)
+  - Requires server rewrites or `_redirects` file for production deployment
+  - Best for modern hosting platforms (Netlify, Vercel)
+- `SPA = false`: Uses hash-based routing (`#/`, `#/blog/post-slug`)
+  - Works without server configuration
+  - Ideal for simple hosting (GitHub Pages, S3)
+
+### 4. Open or Deploy
+
+Open locally or deploy to any static host.
+
+---
+
+## Routing
+
+This site supports two routing modes controlled by the `SPA` flag:
+
+### History State Routing (`SPA = true`)
+- Uses `history.pushState` for clean URLs without hash symbols
+- URLs look like: `/`, `/blog/my-post`
+- Requires server-side configuration to redirect all requests to `index.html`
+- **Deployment requirements:**
+  - **Netlify/Vercel:** Include `_redirects` file (already provided)
+  - **Apache:** Use `.htaccess` with `RewriteRule`
+  - **Nginx:** Configure `try_files $uri /index.html`
+
+### Hash-Based Routing (`SPA = false`)
+- Uses URL hash for navigation
+- URLs look like: `#/`, `#/blog/my-post`
+- No server configuration needed — works anywhere
+- **Best for:** GitHub Pages, S3 static hosting, or simple CDN deployments
+
+The included `_redirects` file enables history state routing on Netlify:
+```
+/*    /index.html   200
+```
+
+---
 
 ## License
 
 MIT
+
+---
+
+## Learn More
+
+- https://sleekcms.com
+- https://www.npmjs.com/package/@sleekcms/client
