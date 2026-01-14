@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Loading…</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.classless.min.css" />
+  </head>
+
+  <body>
+    <header style="display: flex; align-items: flex-start; justify-content: space-between">
+      <h1 id="siteTitle" style="font-weight: 400">…</h1>
+      <nav><a id="homeLink">Home</a></nav>
+    </header>
+    <main>
+      <article id="app">
+        <div class="secondary">Loading…</div>
+      </article>
+    </main>
+
+    <footer>Minimal Single-Page App Blog using SleekCMS client. Go ahead, right click and view source.</footer>
+
+    <!-- SleekCMS client from unpkg -->
+    <script src="https://unpkg.com/@sleekcms/client"></script>
+
+    <script>
+      // ====== CONFIG ======
+      // Put your SleekCMS content site token here. Register at https://app.sleekcms.com/
+      const SITE_TOKEN = "pub-2kzel-5d6ab732e37c4a2ea36ae91ccc509577";
+      const ENV = "latest";
+      // SPA mode: true = use history.pushState, false = use hash routing
+      const SPA = false; // Set to true to enable history routing
+
+      // ====== STATE ======
+      let client = null;
+      let homePage = null;
+      let blogPages = []; // list under /blog
+      let pagesByPath = new Map(); // "/blog/post1" => page
+
+      const elApp = document.getElementById("app");
+      const elSiteTitle = document.getElementById("siteTitle");
+
+      // ====== HELPERS ======
+      function normalizePath(p) {
+        if (!p) return "/";
+        if (!p.startsWith("/")) p = "/" + p;
+        if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+        return p;
+      }
+
+
+      function getCurrentPath() {
+        if (SPA) {
+          const raw = location.pathname + location.search;
+          const pathOnly = raw.split("?")[0] || "/";
+          return normalizePath(pathOnly);
+        } else {
+          const raw = (location.hash || "#/" ).slice(1);
+          const pathOnly = raw.split("?")[0] || "/";
+          return normalizePath(pathOnly);
+        }
+      }
+
+      function escapeHtml(str) {
+        return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+      }
+
+      function setTitle(text) {
+        const t = (text && String(text).trim()) || "Blog";
+        document.title = t;
+        elSiteTitle.textContent = homePage && homePage.title ? String(homePage.title) : "My Blog";
+      }
+
+      function isBlogPostPath(p) {
+        const path = normalizePath(p);
+        return path.startsWith("/blog/") && path.length > "/blog/".length;
+      }
+
+      // ====== RENDERING ======
+      function renderError(message, detail) {
+        const homeHref = SPA ? "/" : "#/";
+        elApp.innerHTML = `
+          <article>
+            <strong>Error:</strong> ${escapeHtml(message)}
+            ${detail ? `<pre class="secondary">${escapeHtml(detail)}</pre>` : ""}
+            <div style="margin-top:1rem;"><a class="secondary" href="${homeHref}">Go back to home</a></div>
+          </article>
+        `;
+      }
+
+      function renderHome() {
+        const siteTitle = homePage && homePage.title ? String(homePage.title) : "My Blog";
+        setTitle(siteTitle);
+
+        const posts = blogPages
+          .filter((p) => isBlogPostPath(p._path))
+          .slice()
+          .sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+
+        const makeHref = (path) => SPA ? encodeURI(path) : `#${encodeURI(path)}`;
+        const listHtml = posts.length
+          ? `<ul>
+              ${posts
+                .map((p) => {
+                  const path = normalizePath(p._path);
+                  const title = p.title || path;
+                  return `
+                  <li>
+                    <a href="${makeHref(path)}">
+                      ${escapeHtml(title)}
+                    </a>
+                  </li>
+                `;
+                })
+                .join("")}
+            </ul>`
+          : `<div class="secondary">No blog posts found under <code>/blog</code>.</div>`;
+
+        elApp.innerHTML = `
+          <section>
+            ${listHtml}
+          </section>
+        `;
+      }
+
+      function renderPost(path) {
+        const page = pagesByPath.get(path);
+
+        if (!page) {
+          renderError("Post not found.", `No page found for path: ${path}`);
+          return;
+        }
+
+        const title = page.title || path;
+        setTitle(title);
+
+        elApp.innerHTML = `
+            <h2>${escapeHtml(title)}</h2>
+            ${
+              page.image && page.image.url
+                ? `
+              <img
+                src="${escapeHtml(page.image.url)}"
+                alt="${escapeHtml(title)}"
+                style="width:100%; max-height:360px; object-fit:cover; border-radius:var(--pico-border-radius, 0.5rem); margin-bottom:1rem;"
+                loading="lazy"
+              />
+            `
+                : ``
+            }
+            <div id="postContent" class="content" style="margin-top:1rem;"></div>
+        `;
+
+        document.getElementById("postContent").innerHTML = page.content || `<p>No content.</p>`;
+      }
+
+
+      function renderRoute() {
+        if (!client) return;
+        const path = getCurrentPath();
+        if (path === "/") return renderHome();
+        return renderPost(path);
+      }
+
+
+      async function loadContent() {
+        if (!window.SleekCMS || !window.SleekCMS.createSyncClient) {
+          return renderError("SleekCMS client not available.", "Failed to load https://unpkg.com/@sleekcms/client");
+        }
+
+        elApp.innerHTML = `<div>Loading content from SleekCMS…</div>`;
+
+        try {
+          client = await window.SleekCMS.createSyncClient({
+            siteToken: SITE_TOKEN,
+            env: ENV || "latest",
+            resolveEnv: true,
+          });
+
+          homePage = client.getPage("/"); // { title, ... }
+          blogPages = client.getPages("/blog"); // [ { title, image, content, _path, _slug }, ... ]
+
+          // Build index for routing
+          pagesByPath = new Map();
+          if (homePage) pagesByPath.set("/", { ...homePage, _path: "/" });
+
+          for (const p of blogPages || []) {
+            const np = normalizePath(p._path);
+            pagesByPath.set(np, { ...p, _path: np });
+          }
+
+          // Ensure we always have a hash or path
+          if (SPA) {
+            if (location.pathname === "/") {
+              history.replaceState({}, "", "/");
+            }
+          } else {
+            if (!location.hash) location.hash = "#/";
+          }
+          renderRoute();
+        } catch (err) {
+          client = null;
+          renderError("Failed to load content.", err?.message || String(err));
+        }
+      }
+
+      if (SPA) {
+        // Set Home link href
+        document.getElementById("homeLink").setAttribute("href", "/");
+        window.addEventListener("popstate", renderRoute);
+        // Delegate click events for internal links
+        document.body.addEventListener("click", function (e) {
+          const a = e.target.closest("a");
+          if (a && a.getAttribute("href") && a.getAttribute("href").startsWith("/")) {
+            e.preventDefault();
+            history.pushState({}, "", a.getAttribute("href"));
+            renderRoute();
+          }
+        });
+      } else {
+        // Set Home link href
+        document.getElementById("homeLink").setAttribute("href", "#/" );
+        window.addEventListener("hashchange", renderRoute);
+      }
+
+      // Start
+      loadContent();
+    </script>
+  </body>
+</html>
