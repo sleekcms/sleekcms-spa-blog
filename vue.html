@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Loading…</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.classless.min.css" />
+  </head>
+
+  <body id="app">
+      <header style="display: flex; align-items: flex-start; justify-content: space-between">
+        <div>
+          <h1 style="font-weight: 400">{{ siteTitle }}</h1>
+          <small>{{ siteSubtitle }}</small>
+        </div>
+        <nav><a :href="homeHref" @click="navigate">Home</a></nav>
+      </header>
+
+      <main>
+        <article>
+          <!-- Loading State -->
+          <div v-if="loading" class="secondary">Loading content from SleekCMS…</div>
+
+          <!-- Error State -->
+          <template v-else-if="error">
+            <strong>Error:</strong> {{ error.message }}
+            <pre v-if="error.detail" class="secondary">{{ error.detail }}</pre>
+            <div style="margin-top:1rem;">
+              <a class="secondary" :href="homeHref" @click="navigate">Go back to home</a>
+            </div>
+          </template>
+
+          <!-- Home View -->
+          <section v-else-if="currentPath === '/'">
+            <ul v-if="posts.length">
+              <li v-for="post in posts" :key="post._path">
+                <a :href="makeHref(post._path)" @click="navigate">{{ post.title || post._path }}</a>
+              </li>
+            </ul>
+            <div v-else class="secondary">No blog posts found under <code>/blog</code>.</div>
+          </section>
+
+          <!-- Post View -->
+          <template v-else-if="currentPage">
+            <h2>{{ currentPage.title || currentPath }}</h2>
+            <img
+              v-if="currentPage.image?.url"
+              :src="currentPage.image.url"
+              :alt="currentPage.title"
+              style="width:100%; max-height:360px; object-fit:cover; border-radius:var(--pico-border-radius, 0.5rem); margin-bottom:1rem;"
+              loading="lazy"
+            />
+            <div class="content" style="margin-top:1rem;" v-html="currentPage.content || '<p>No content.</p>'"></div>
+          </template>
+
+          <!-- 404 -->
+          <template v-else>
+            <strong>Error:</strong> Post not found.
+            <pre class="secondary">No page found for path: {{ currentPath }}</pre>
+            <div style="margin-top:1rem;">
+              <a class="secondary" :href="homeHref" @click="navigate">Go back to home</a>
+            </div>
+          </template>
+        </article>
+      </main>
+
+      <footer style="text-align: center;">
+        <small>View source — this entire site is just this one HTML file.</small>
+        <br/>
+        <small>
+          <a href="https://github.com/sleekcms/sleekcms-spa-blog/blob/main/vue.html" target="_blank" rel="noopener">View Source</a>
+          •
+          <a href="https://github.com/sleekcms/sleekcms-next-blog" target="_blank" rel="noopener">Using Next.js</a>
+          •
+          <a href="https://app.sleekcms.com" target="_blank" rel="noopener">Login to SleekCMS</a>
+        </small>
+      </footer>
+
+    <!-- Vue.js via CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- SleekCMS client from unpkg -->
+    <script src="https://unpkg.com/@sleekcms/client"></script>
+
+    <script>
+      const { createApp, ref, computed, onMounted, onUnmounted, watch } = Vue;
+
+      // ====== CONFIG ======
+      const SITE_TOKEN = "pub-2kzel-5d6ab732e37c4a2ea36ae91ccc509577";
+      const ENV = "latest";
+      const SPA = true; // true = history.pushState, false = hash routing
+
+      createApp({
+        setup() {
+          // State
+          const loading = ref(true);
+          const error = ref(null);
+          const homePage = ref(null);
+          const blogPages = ref([]);
+          const pagesByPath = ref(new Map());
+          const currentPath = ref("/");
+
+          // Computed
+          const homeHref = computed(() => SPA ? "/" : "#/");
+
+          const siteTitle = computed(() => 
+            homePage.value?.title || "My Blog"
+          );
+
+          const siteSubtitle = computed(() => 
+            homePage.value?.sub_title || "Minimal Single-Page App Blog using SleekCMS client"
+          );
+
+          const posts = computed(() => 
+            blogPages.value
+              .filter(p => isBlogPostPath(p._path))
+              .sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")))
+          );
+
+          const currentPage = computed(() => 
+            pagesByPath.value.get(currentPath.value)
+          );
+
+          // Update document title when page changes
+          watch([currentPath, currentPage, siteTitle], () => {
+            if (currentPath.value === "/") {
+              document.title = siteTitle.value;
+            } else if (currentPage.value) {
+              document.title = currentPage.value.title || currentPath.value;
+            }
+          });
+
+          // Helpers
+          function normalizePath(p) {
+            if (!p) return "/";
+            if (!p.startsWith("/")) p = "/" + p;
+            if (p.length > 1 && p.endsWith("/")) p = p.slice(0, -1);
+            return p;
+          }
+
+          function getCurrentPath() {
+            if (SPA) {
+              const raw = location.pathname + location.search;
+              const pathOnly = raw.split("?")[0] || "/";
+              return normalizePath(pathOnly);
+            } else {
+              const raw = (location.hash || "#/").slice(1);
+              const pathOnly = raw.split("?")[0] || "/";
+              return normalizePath(pathOnly);
+            }
+          }
+
+          function isBlogPostPath(p) {
+            const path = normalizePath(p);
+            return path.startsWith("/blog/") && path.length > "/blog/".length;
+          }
+
+          function makeHref(path) {
+            return SPA ? encodeURI(path) : `#${encodeURI(path)}`;
+          }
+
+          function navigate(e) {
+            if (!SPA) return; // Let hash navigation work naturally
+            const href = e.target.getAttribute("href");
+            if (href && href.startsWith("/")) {
+              e.preventDefault();
+              history.pushState({}, "", href);
+              currentPath.value = getCurrentPath();
+            }
+          }
+
+          function handleRouteChange() {
+            currentPath.value = getCurrentPath();
+          }
+
+          // Load content
+          async function loadContent() {
+            if (!window.SleekCMS?.createSyncClient) {
+              error.value = {
+                message: "SleekCMS client not available.",
+                detail: "Failed to load https://unpkg.com/@sleekcms/client"
+              };
+              loading.value = false;
+              return;
+            }
+
+            try {
+              const client = await window.SleekCMS.createSyncClient({
+                siteToken: SITE_TOKEN,
+                env: ENV || "latest",
+                resolveEnv: true,
+              });
+
+              homePage.value = client.getPage("/");
+              blogPages.value = client.getPages("/blog") || [];
+
+              // Build index
+              const pathMap = new Map();
+              if (homePage.value) {
+                pathMap.set("/", { ...homePage.value, _path: "/" });
+              }
+              for (const p of blogPages.value) {
+                const np = normalizePath(p._path);
+                pathMap.set(np, { ...p, _path: np });
+              }
+              pagesByPath.value = pathMap;
+
+              // Initialize path
+              if (SPA && location.pathname === "/") {
+                history.replaceState({}, "", "/");
+              } else if (!SPA && !location.hash) {
+                location.hash = "#/";
+              }
+              currentPath.value = getCurrentPath();
+              loading.value = false;
+            } catch (err) {
+              error.value = {
+                message: "Failed to load content.",
+                detail: err?.message || String(err)
+              };
+              loading.value = false;
+            }
+          }
+
+          // Lifecycle
+          onMounted(() => {
+            if (SPA) {
+              window.addEventListener("popstate", handleRouteChange);
+            } else {
+              window.addEventListener("hashchange", handleRouteChange);
+            }
+            loadContent();
+          });
+
+          onUnmounted(() => {
+            if (SPA) {
+              window.removeEventListener("popstate", handleRouteChange);
+            } else {
+              window.removeEventListener("hashchange", handleRouteChange);
+            }
+          });
+
+          return {
+            loading,
+            error,
+            currentPath,
+            homeHref,
+            siteTitle,
+            siteSubtitle,
+            posts,
+            currentPage,
+            makeHref,
+            navigate,
+          };
+        }
+      }).mount("#app");
+    </script>
+  </body>
+</html>
