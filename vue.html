@@ -30,6 +30,28 @@
             </div>
           </template>
 
+<!-- Vue Welcome View -->
+          <section v-else-if="currentPath === '/vue'">
+            <!-- Welcome Message -->
+            <div style="text-align: center; padding: 3rem 1rem;">
+              <div style="font-size: 4rem; margin-bottom: 1rem;">⚡</div>
+              <h2 style="font-size: 2rem; font-weight: 600; margin-bottom: 1rem; background: linear-gradient(135deg, #42b883, #35495e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                Built with Vue.js
+              </h2>
+              <p style="font-size: 1.15rem; color: #666; max-width: 500px; margin: 0 auto 1.5rem; line-height: 1.6;">
+                This page is powered by <strong style="color: #42b883;">Vue.js</strong> loaded directly in the browser as a <strong>single page application</strong> — no build step required.
+              </p>
+              <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2rem;">
+                <span style="background: #f0f0f0; padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.85rem; color: #555;">🚀 Zero Build</span>
+                <span style="background: #f0f0f0; padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.85rem; color: #555;">📦 CDN Loaded</span>
+                <span style="background: #f0f0f0; padding: 0.4rem 0.8rem; border-radius: 2rem; font-size: 0.85rem; color: #555;">⚡ Instant Start</span>
+              </div>
+              <a href="/" @click="navigate" style="display: inline-block; background: linear-gradient(135deg, #42b883, #35495e); color: white; padding: 0.75rem 2rem; border-radius: 0.5rem; text-decoration: none; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 14px rgba(66, 184, 131, 0.3);">
+                🏠 Click on Home to Start
+              </a>
+            </div>
+          </section>
+
           <!-- Home View -->
           <section v-else-if="currentPath === '/'">
             <ul v-if="posts.length">

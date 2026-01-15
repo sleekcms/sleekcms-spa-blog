@@ -3,8 +3,30 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="description" content="A minimal single-page app blog powered by SleekCMS" />
+    <meta name="theme-color" content="#1a1a2e" />
+    <link rel="icon" href="/sleekcms.svg" type="image/svg+xml" />
     <title>Loading…</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.classless.min.css" />
+
+    <!-- Preconnect to CDN origins -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="preconnect" href="https://unpkg.com" crossorigin />
+
+    <!-- Non-blocking CSS with preload pattern -->
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.classless.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+    <noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.classless.min.css" /></noscript>
+
+    <!-- Critical inline CSS for initial render -->
+    <style>
+      *,*::before,*::after{box-sizing:border-box}
+      body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.5;margin:0;padding:1rem 1rem 0}
+      h1{font-size:2rem;margin:0 0 .25rem}
+      a{color:#1095c1;text-decoration:none}
+      a:hover{text-decoration:underline}
+      .secondary{color:#6c757d}
+      header,main,footer{max-width:48rem;margin:0 auto}
+      #app{min-height:50vh}
+    </style>
   </head>
 
   <body>
@@ -16,7 +38,7 @@
       <nav><a id="homeLink">Home</a></nav>
     </header>
     <main>
-      <article id="app">
+      <article id="app" style="min-height:50vh">
         <div class="secondary">Loading…</div>
       </article>
     </main>
@@ -35,8 +57,8 @@
       </small>
     </footer>
 
-    <!-- SleekCMS client from unpkg -->
-    <script src="https://unpkg.com/@sleekcms/client"></script>
+    <!-- SleekCMS client from unpkg (loaded async, init waits for it) -->
+    <script src="https://unpkg.com/@sleekcms/client" id="sleekcms-script"></script>
 
     <script>
       // ====== CONFIG ======
@@ -81,11 +103,87 @@
         return String(str).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
       }
 
+      function setMeta(options = {}) {
+        const { title, description, image, url } = options;
+        const siteTitle = homePage && homePage.title ? String(homePage.title) : "My Blog";
+        const siteDescription = homePage && homePage.sub_title ? String(homePage.sub_title) : "A minimal single-page app blog powered by SleekCMS";
+
+        // Page title
+        const pageTitle = title ? `${title} | ${siteTitle}` : siteTitle;
+        document.title = pageTitle;
+
+        // Site header
+        elSiteTitle.textContent = siteTitle;
+        elSiteSubtitle.textContent = siteDescription;
+
+        // Meta description
+        let metaDesc = document.querySelector('meta[name="description"]');
+        if (!metaDesc) {
+          metaDesc = document.createElement('meta');
+          metaDesc.name = 'description';
+          document.head.appendChild(metaDesc);
+        }
+        metaDesc.content = description || siteDescription;
+
+        // Canonical URL
+        const canonicalUrl = url || location.href;
+        let linkCanonical = document.querySelector('link[rel="canonical"]');
+        if (!linkCanonical) {
+          linkCanonical = document.createElement('link');
+          linkCanonical.rel = 'canonical';
+          document.head.appendChild(linkCanonical);
+        }
+        linkCanonical.href = canonicalUrl;
+
+        // Open Graph tags
+        const ogTags = {
+          'og:title': title || siteTitle,
+          'og:description': description || siteDescription,
+          'og:url': canonicalUrl,
+          'og:type': title ? 'article' : 'website',
+          'og:image': image || ''
+        };
+
+        for (const [property, content] of Object.entries(ogTags)) {
+          let meta = document.querySelector(`meta[property="${property}"]`);
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.setAttribute('property', property);
+            document.head.appendChild(meta);
+          }
+          if (content) {
+            meta.content = content;
+          } else if (property === 'og:image') {
+            meta.remove(); // Remove empty og:image
+          }
+        }
+
+        // Twitter Card tags
+        const twitterTags = {
+          'twitter:card': image ? 'summary_large_image' : 'summary',
+          'twitter:title': title || siteTitle,
+          'twitter:description': description || siteDescription,
+          'twitter:image': image || ''
+        };
+
+        for (const [name, content] of Object.entries(twitterTags)) {
+          let meta = document.querySelector(`meta[name="${name}"]`);
+          if (!meta) {
+            meta = document.createElement('meta');
+            meta.name = name;
+            document.head.appendChild(meta);
+          }
+          if (content) {
+            meta.content = content;
+          } else if (name === 'twitter:image') {
+            meta.remove();
+          }
+        }
+      }
+
+      // Legacy wrapper for compatibility
       function setTitle(text) {
-        const t = (text && String(text).trim()) || "Blog";
-        document.title = t;
-        elSiteTitle.textContent = homePage && homePage.title ? String(homePage.title) : "My Blog";
-        elSiteSubtitle.textContent = homePage && homePage.sub_title ? String(homePage.sub_title) : "Minimal Single-Page App Blog using SleekCMS client";
+        setMeta({ title: text });
       }
 
       function isBlogPostPath(p) {
@@ -107,7 +205,12 @@
 
       function renderHome() {
         const siteTitle = homePage && homePage.title ? String(homePage.title) : "My Blog";
-        setTitle(siteTitle);
+        const siteDescription = homePage && homePage.sub_title ? String(homePage.sub_title) : "A minimal single-page app blog powered by SleekCMS";
+        setMeta({
+          title: null,
+          description: siteDescription,
+          url: location.origin + '/'
+        });
 
         const posts = blogPages
           .filter((p) => isBlogPostPath(p._path))
@@ -149,7 +252,19 @@
         }
 
         const title = page.title || path;
-        setTitle(title);
+        
+        // Extract description from content (first 160 chars of text)
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = page.content || '';
+        const textContent = tempDiv.textContent || tempDiv.innerText || '';
+        const description = textContent.trim().slice(0, 160).replace(/\s+/g, ' ').trim() + (textContent.length > 160 ? '…' : '');
+
+        setMeta({
+          title: title,
+          description: page.description || description || null,
+          image: page.image && page.image.url ? page.image.url : null,
+          url: location.origin + path
+        });
 
         elApp.innerHTML = `
             <h2>${escapeHtml(title)}</h2>
